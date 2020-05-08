@@ -36,37 +36,140 @@ GENDERS = {
 }
 
 
-class CharField(object):
-    pass
+class BaseField(object):
+    def __init__(self, name=None, required=False, 
+                 nullable=True, type_check=None):
+        self.required = required
+        self.nullable = nullable
+        self.type_check = type_check
+        self._value = None
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, _value):
+        if self.type_check and \
+           not isinstance(_value, self.type_check):
+            raise ValueError("Value: {} must be type: {}"
+                             .format(_value, self.type_check))
+        self._value = _value
 
 
-class ArgumentsField(object):
-    pass
+class CharField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(CharField, self).__init__(name, required, nullable, type_check)
 
 
-class EmailField(CharField):
-    pass
+class ArgumentsField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=dict):
+        super(ArgumentsField, self).__init__(name, required, nullable, type_check)
 
 
-class PhoneField(object):
-    pass
+# Здесь не понял зачем наследование от CharField       
+# class EmailField(CharField):
+class EmailField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(EmailField, self).__init__(name, required, nullable, type_check)
+    
+    @property
+    def value():
+        super(EmailField, self).value()
+
+    @value.setter
+    def value(self, _value):
+        if value and not ('@' in _value):
+            raise ValueError("must be @ in the address {}".format(_value))
+        self._value = _value
 
 
-class DateField(object):
-    pass
+class PhoneField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(PhoneField, self).__init__(name, required, nullable, type_check)
+    
+    @property
+    def value():
+        super(PhoneField, self).value()
+
+    @value.setter
+    def value(self, _value):
+        if not isinstance(_value, (str, int)):
+            raise ValueError("must be str or int {}".format(_value))
+        if not re.match(r'^7.{10}$', str(_value)):
+            raise ValueError("must be 10 digits".format(_value))
+        self._value = _value
 
 
-class BirthDayField(object):
-    pass
+class DateField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(DateField, self).__init__(name, required, nullable, type_check)
+
+    @property
+    def value():
+        super(DateField, self).value()
+
+    @value.setter
+    def value(self, _value):
+        if not datetime.strptime(_value, '%d.%m.%Y'):
+            raise ValueError("must be date %d.%m.%Y {}".format(_value))
+        self._value = _value
 
 
-class GenderField(object):
-    pass
+class BirthDayField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(BirthDayField, self).__init__(name, required, nullable, type_check)
 
+    @property
+    def value():
+        super(BirthDayField, self).value()
 
-class ClientIDsField(object):
-    pass
+    @value.setter
+    def value(self, _value):
+        if (datetime.now() - datetime.strptime(_value, '%d.%m.%Y')).days <= 365 * 70:
+            raise ValueError("must be less 70 years old".format(_value))
+        self._value = _value
 
+class GenderField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(GenderField, self).__init__(name, required, nullable, type_check)
+
+    @property
+    def value():
+        super(GenderField, self).value()
+
+    @value.setter
+    def value(self, _value):
+        if value and value not in (UNKNOWN, MALE, FEMALE):
+            raise ValueError("must be 0 (UNKNOWN), \
+                              1 (MALE), \
+                              2 (FEMALE) {}".format(_value))
+        self._value = _value
+
+class ClientIDsField(BaseField):
+    def __init__(self, name=None, required=False,
+                 nullable=True, type_check=str):
+        super(ClientIDsField, self).__init__(name, required, nullable, type_check)
+
+    @property
+    def value():
+        super(BaseField, self).value()
+
+    @value.setter
+    def value(self, _value):
+        if not isinstance(_value, list) or \
+           any(not isinstance(x, int) for x in _value):
+            raise ValueError("must be list of int".format(_value))
+        if len(_value) == 0:
+            raise ValueError("empty list".format(_value))
+        self._value = _value
 
 class ClientsInterestsRequest(object):
     client_ids = ClientIDsField(required=True)
@@ -92,7 +195,6 @@ class MethodRequest(object):
     @property
     def is_admin(self):
         return self.login == ADMIN_LOGIN
-
 
 def check_auth(request):
     if request.is_admin:
@@ -134,7 +236,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
             if path in self.router:
                 try:
                     response, code = self.router[path]({"body": request, "headers": self.headers}, context, self.store)
-                except Exception, e:
+                except e:
                     logging.exception("Unexpected error: %s" % e)
                     code = INTERNAL_ERROR
             else:
