@@ -293,7 +293,6 @@ def check_auth(request):
 
 
 def method_handler(request, ctx, store):
-    print("#########################")
     answer = MethodRequest(request)
     response, code = answer.response
     return response, code
